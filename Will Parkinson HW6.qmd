@@ -1,0 +1,158 @@
+---
+title: "Will Parkinson HW6"
+author: "Will Parkinson"
+editor: visual
+format:
+  html:
+    embed-resources: true
+    code-fold: true
+execute:
+  echo: true
+  message: false
+  warning: false
+---
+
+```{r setup}
+library(tidyverse)
+library(tidytext)
+library(schrute)
+```
+
+# The Office
+
+Let's continue to work with *The Office* text from the [schrute](https://cran.r-project.org/web/packages/schrute/index.html) package.
+
+# Sentiment Analysis
+
+### Over Time
+
+Calculate the sentiment score (positive - negative) for each episode, and plot this variable over time.
+
+```{r}
+episode_sentiment <- theoffice |>
+  unnest_tokens(word, text) |>
+  inner_join(sentiments, by = "word") |>
+  group_by(season, episode, imdb_rating) |>
+  summarize(
+    pos_score = sum(sentiment == "positive"),
+    neg_score = sum(sentiment == "negative"),
+    sent_score = pos_score - neg_score,
+    .groups = "drop"
+  ) |>
+  arrange(season, episode) |>
+  mutate(ep_num = row_number())
+
+episode_sentiment |>
+  ggplot(aes(x = ep_num, y = sent_score, fill = factor(season))) +
+  geom_col(alpha = 0.8) +
+  geom_smooth(se = FALSE, color = "black") +
+  labs(
+    x = "Episode (in airing order)",
+    y = "Sentiment Score (Positive Minus Negative)",
+    title = "The Office: Episode Sentiment Over Time",
+    fill = "Season"
+  ) +
+  theme_minimal()
+```
+
+Sentiment scores fluctuate considerably episode to episode. The smoothing line shows significant upticks in sentiment at the beginning and end of season 4 as well as a huge spike in sentiment very end of the show, potentially pointing to a sweet and sappy ending. Generally, sentiment tends to increase at the end of every season.
+
+### By Rating
+
+Create a scatterplot of the `imdb_rating` versus the sentiment score (positive - negative), where the case is again an episode. Decide whether a linear model is a good fit to this relationship (optional, if you have had modeling classes, what model looks best?). Comment on what you find.
+
+```{r}
+episode_sentiment |>
+  ggplot(aes(x = imdb_rating, y = sent_score)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE, color = "darkred") +
+  labs(
+    x = "IMDB Rating",
+    y = "Sentiment Score (Positive − Negative)",
+    title = "The Office: Sentiment vs. IMDB Rating"
+  ) +
+  theme_minimal()
+```
+
+There does not appear to be anything more than a very weak linear relationship between sentiment score and IMDB rating. The trend line positively sloped, but the scatter around it is pretty wide, making me think that a linear model is a poor fit. Higher-rated episodes do not seem to be systematically more positive or negative in their language.
+
+### Sentiment Negation
+
+Identify at least a few negations that change the sentiment values based on the text. Use this to recreate the graphs above (or do this first, then create the graphs).
+
+```{r}
+office_bigrams <- theoffice |>
+  unnest_tokens(bigram, text, token = "ngrams", n = 2, drop = FALSE) |>
+  drop_na(bigram) |>
+  separate(bigram, into = c("word1", "word2"), sep = " ", remove = FALSE)
+
+# Explore words that most often precede sentiment words — focus on "n" words
+office_bigrams |>
+  inner_join(sentiments, by = c("word2" = "word")) |>
+  filter(str_starts(word1, "n")) |>
+  count(word1, sort = TRUE) |>
+  head(10)
+```
+
+"not" and "no" are by far the most frequent negations preceding sentiment words.
+
+```{r}
+reversal_words <- c("not", "no", "never", "nor", "hardly", "nothing")
+
+# A few examples of negations from The Office
+office_bigrams |>
+  inner_join(sentiments, by = c("word2" = "word")) |>
+  filter(word1 %in% reversal_words) |>
+  count(word1, word2, sentiment, sort = TRUE) |>
+  head(10)
+```
+
+The most common examples are "not like" and "no problem".
+
+```{r}
+episode_sentiment_neg <- office_bigrams |>
+  inner_join(sentiments |> rename(sentiment0 = sentiment), by = c("word2" = "word")) |>
+  mutate(
+    sentiment = case_when(
+      word1 %in% reversal_words & sentiment0 == "positive" ~ "negative",
+      word1 %in% reversal_words & sentiment0 == "negative" ~ "positive",
+      TRUE ~ sentiment0
+    )
+  ) |>
+  group_by(season, episode, imdb_rating) |>
+  summarize(
+    pos_score = sum(sentiment == "positive"),
+    neg_score = sum(sentiment == "negative"),
+    sent_score = pos_score - neg_score,
+    .groups = "drop"
+  ) |>
+  arrange(season, episode) |>
+  mutate(ep_num = row_number())
+
+# Over time — negation adjusted
+episode_sentiment_neg |>
+  ggplot(aes(x = ep_num, y = sent_score, fill = factor(season))) +
+  geom_col(alpha = 0.8) +
+  geom_smooth(se = FALSE, color = "black") +
+  labs(
+    x = "Episode (in airing order)",
+    y = "Sentiment Score (Positive − Negative)",
+    title = "The Office: Episode Sentiment Over Time (Negation-Adjusted)",
+    fill = "Season"
+  ) +
+  theme_minimal()
+
+# By rating — negation adjusted
+episode_sentiment_neg |>
+  ggplot(aes(x = imdb_rating, y = sent_score)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE, color = "darkred") +
+  labs(
+    x = "IMDB Rating",
+    y = "Sentiment Score (Positive − Negative)",
+    title = "The Office: Sentiment vs. IMDB Rating (Negation-Adjusted)"
+  ) +
+  theme_minimal()
+```
+
+The negation-adjusted plots look essentially the same as the originals. The overall pattern holds; there's still minimal correlation between sentiment and IMDB rating, and sentiment still spikes at the end of most seasons. The bigram approach misses the first word of each dialogue line, but since negation words rarely open a sentence, this had very little impact on the results.
