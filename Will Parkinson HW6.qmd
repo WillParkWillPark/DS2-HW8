@@ -57,6 +57,8 @@ episode_sentiment |>
 
 Sentiment scores fluctuate considerably episode to episode. The smoothing line shows significant upticks in sentiment at the beginning and end of season 4 as well as a huge spike in sentiment very end of the show, potentially pointing to a sweet and sappy ending. Generally, sentiment tends to increase at the end of every season.
 
+Max's Comments: I like what you did here with the geom_smooth and adding the black line. I am curious as to why you considered this.
+
 ### By Rating
 
 Create a scatterplot of the `imdb_rating` versus the sentiment score (positive - negative), where the case is again an episode. Decide whether a linear model is a good fit to this relationship (optional, if you have had modeling classes, what model looks best?). Comment on what you find.
@@ -96,6 +98,8 @@ office_bigrams |>
 
 "not" and "no" are by far the most frequent negations preceding sentiment words.
 
+Max's Comments: I like how you approached this problem looking at words starting with n that most often preceded sentiment words. It exposed many of the common ones like not, not, never, and nothing.
+
 ```{r}
 reversal_words <- c("not", "no", "never", "nor", "hardly", "nothing")
 
@@ -108,6 +112,8 @@ office_bigrams |>
 ```
 
 The most common examples are "not like" and "no problem".
+
+Max's Comments: I like that you showed these examples. It showed some clear negation examples like "not good" being ranked as positive.
 
 ```{r}
 episode_sentiment_neg <- office_bigrams |>
@@ -156,3 +162,5 @@ episode_sentiment_neg |>
 ```
 
 The negation-adjusted plots look essentially the same as the originals. The overall pattern holds; there's still minimal correlation between sentiment and IMDB rating, and sentiment still spikes at the end of most seasons. The bigram approach misses the first word of each dialogue line, but since negation words rarely open a sentence, this had very little impact on the results.
+
+Max's Suggestion: I like your code so I don't have much suggestions for that in particular. My only suggestion (and you might already do this without breaking out the code) would be to test all the code first in different chunks. For example, I would leave this code as one chunk and test it's output: theoffice \|\> unnest_tokens(word, text). Then I would try this code next and test to make sure it's output looks as I want: theoffice \|\> unnest_tokens(word, text) \|\> inner_join(sentiments, by = "word") \|\> group_by(season, episode, imdb_rating). To me, it helps show I tested all of the code to confirm it's what I expect before combining the whole chunk together. Otherwise, I enjoyed this report.
